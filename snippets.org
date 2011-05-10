@@ -1,35 +1,44 @@
 * General
 ** Generate TAGS file for method/function lookup
+The resulting file can be used by your editor to search and navigate large
+codebases in an efficient manner.
 #+BEGIN_SRC sh
 find {client_web,server} -name '*.py' | grep -v "/build/" | etags --output TAGS -
 #+END_SRC
 ** Keyboard buggered?
+Example usage of the pipe character without using the pipe key:
 #+BEGIN_SRC sh
-pipe() { python -c 'print chr(0x7c)'; }
-egrep "net`pipe`ssh" /var/log/dmesg
+stevechallis$ pipe() { python -c 'print chr(0x7c)'; }
+stevechallis$ egrep "net`pipe`ssh" /var/log/dmesg
 #+END_SRC
 * Systems administration
 ** Web
 *** Apache processes
 **** Find the average process size in kilobytes
+#+BEGIN_SRC sh
 ps -ylC httpd --sort:rss
-** Virtualisation
+#+END_SRC
 ** Puppet
 *** Reload manifest from master
 #+BEGIN_SRC sh
 sudo puppetd --test --no-noop
 #+END_SRC
 *** Clear out old certificates (e.g. after reinstall)
-**** Client
-rm /var/lib/puppet/ssl
-**** Server
-puppetca --clear <FQDN>
+**** Client =rm /var/lib/puppet/ssl=
+**** Server =puppetca --clear <FQDN>=
 *** URIs
-Use puppet:///myfile to reference a file on the puppetmaster
-** Check for hardware support
-egrep '(vmx|svm)' /proc/cpuinfo # vmx: intel, svm: amd
+Use =puppet:///myfile= to reference a file on the puppetmaster
+** Virtualisation
+*** Check for hardware support
+vmx on intel, svm on amd
+#+BEGIN_SRC sh
+egrep '(vmx|svm)' /proc/cpuinfo
+#+END_SRC
 ** Shell scripting
 *** Globbing/Bash expansion
+It is important to recognize the effects of wildcard expansion as it can easily
+produce unexpected results. Rsync is also another utility to watch out for
+specifically.
 #+BEGIN_SRC sh
 stevechallis:source$ tree
 .
@@ -62,15 +71,14 @@ stevechallis:source$ find . -name "*.py"
   parents(){ :(){
           read p n <<<`ps -o ppid,comm -p $1 | awk 'NR>1{print $1,$2}'`;
           echo -e "$1\t$n";
-          test $1 -ne 0 && : $p; };
-      : $1; }
+          test $1 -ne 0 && : $p; }; : $1; }
 #+END_SRC
 *** Trim old backups by cron
 #+BEGIN_SRC sh
 # Clean out all ldifs and indices older than 3 months
  find /opt/backup \
      -regextype egrep \
-     -regex ".*.ldif|.*agrega-indices[^/]*" \
+     -regex ".*.ldif|.*indices[^/]*" \
      -ctime +90 \
      | xargs -n 1 rm -rf # -n 1 prevents large numbers of arguments being passed
 #+END_SRC
@@ -139,6 +147,12 @@ MAIL FROM: <steve.challis@siriusit.co.uk>
 #+BEGIN_SRC sh
 ps -eofname | sort | uniq -c | sort -nr | head
 #+END_SRC
+*** Resource usage
+Check the IO and CPU usage to pin down where a problem may be occuring e.g. high
+processor wait may indicate IO problems.
+#+BEGIN_SRC sh
+vmstat 1
+#+END_SRC
 ** Networking
 *** Firewall
 - Usually edit =/etc/init.d/iptables= to add in new rules
@@ -171,6 +185,7 @@ join -1 1 -2 3 <(grep -R "Not After" $BASE/newcerts/ | sed 's;.*/\(.*\)\.pem:;\1
 *** Update Aptitude GPG key
 The update-debian-mirror script can give errors when the Debian certificates
 expire. An error like the following can appear:
+#+BEGIN_SRC txt
 gpgv: Signature made Wed 23 Feb 2011 12:12:32 GMT using RSA key ID 473041FA
 [GNUPG:] ERRSIG AED4B06F473041FA 1 2 00 1298463152 9
 [GNUPG:] NO_PUBKEY AED4B06F473041FA
@@ -183,7 +198,7 @@ Errors:
  Release signature does not verify.
  Release signature does not verify.
 Failed to download some Release or Release.gpg files!?
-
+#+END_SRC
 - Download the new key
   - =gpg --keyserver pgp.mit.edu --recv-keys AED4B06F473041FA=
 - Add the keyring to apt
@@ -297,8 +312,10 @@ time lvcreate --size 120m --snapshot \
 #+END_SRC
 * Editing
 ** SLIME
+|-------------------|---------------------------|
 | C-c C-d C-a       | Slime apropos             |
 | M-x slime-connect | connect to swank instance |
+|-------------------|---------------------------|
 ** Org
 *** Useful shortcuts
 =C-q C-j= to enter raw line break (e.g. for working around org-table-mode)
@@ -320,7 +337,15 @@ running org-export.
 [[file:helloworld.png]]
 *** Evaluating result
 - (Named) results can be moved around
-- Languages must be enabled before evaluation will complete
+- Languages must be enabled (e.g. in =.emacs=) before evaluation will complete: 
+  #+BEGIN_SRC elisp
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((emacs-lisp . nil)
+     (sh . t)
+     (ditaa . t)))
+  #+END_SRC
+
 #+srcname: testbash
 #+BEGIN_SRC sh :exports both :results output
 # Try C-c C-c on me
@@ -388,8 +413,8 @@ Allows fundamental changes to large systems by modifying only the abstract
 ** Monads
 A High level abstraction for threading the result of each given function into
 the next. Flattens out nested function calls.
-http://onclojure.com/2009/03/05/a-monad-tutorial-for-clojure-programmers-part-1/
-http://intensivesystems.net/tutorials/monads_101.html
+- [[http://onclojure.com/2009/03/05/a-monad-tutorial-for-clojure-programmers-part-1/][onclojure.com]]
+- [[http://intensivesystems.net/tutorials/monads_101.html][intensivesystems.net]]
 * Bash
 ** Verify/validate user entered data
 #+BEGIN_SRC sh
@@ -426,6 +451,10 @@ for f in `locate *.pem`; do if grep -q "Not After" $f ; then echo "| $f | $(grep
 #+END_SRC
 ** History expansion
 *** Get last word of last command beginning with 'cp'
- cd !cp:$
+#+BEGIN_SRC sh
+cd !cp:$
+#+END_SRC
 ** Change directory to path output by locate (Problems with unstringified output!)
+#+BEGIN_SRC sh
 cd "$(dirname "$(locate netbeans.clusters | tr -d '\n')")"
+#+END_SRC
