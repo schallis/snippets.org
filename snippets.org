@@ -1,0 +1,431 @@
+* General
+** Generate TAGS file for method/function lookup
+#+BEGIN_SRC sh
+find {client_web,server} -name '*.py' | grep -v "/build/" | etags --output TAGS -
+#+END_SRC
+** Keyboard buggered?
+#+BEGIN_SRC sh
+pipe() { python -c 'print chr(0x7c)'; }
+egrep "net`pipe`ssh" /var/log/dmesg
+#+END_SRC
+* Systems administration
+** Web
+*** Apache processes
+**** Find the average process size in kilobytes
+ps -ylC httpd --sort:rss
+** Virtualisation
+** Puppet
+*** Reload manifest from master
+#+BEGIN_SRC sh
+sudo puppetd --test --no-noop
+#+END_SRC
+*** Clear out old certificates (e.g. after reinstall)
+**** Client
+rm /var/lib/puppet/ssl
+**** Server
+puppetca --clear <FQDN>
+*** URIs
+Use puppet:///myfile to reference a file on the puppetmaster
+** Check for hardware support
+egrep '(vmx|svm)' /proc/cpuinfo # vmx: intel, svm: amd
+** Shell scripting
+*** Globbing/Bash expansion
+#+BEGIN_SRC sh
+stevechallis:source$ tree
+.
+├── 1
+│   ├── test1.py
+│   └── test2.py
+├── 2
+│   ├── 6
+│   │   └── test1.py
+│   └── test2.py
+├── 3
+│   ├── test1.py
+│   └── test2.py
+└── python.py
+
+4 directories, 7 files
+stevechallis:source$ find . -name *.py
+./python.py
+stevechallis:source$ find . -name "*.py"
+./1/test1.py
+./1/test2.py
+./2/6/test1.py
+./2/test2.py
+./3/test1.py
+./3/test2.py
+./python.py
+#+END_SRC
+*** Recursively list process parents
+#+BEGIN_SRC sh
+  parents(){ :(){
+          read p n <<<`ps -o ppid,comm -p $1 | awk 'NR>1{print $1,$2}'`;
+          echo -e "$1\t$n";
+          test $1 -ne 0 && : $p; };
+      : $1; }
+#+END_SRC
+*** Trim old backups by cron
+#+BEGIN_SRC sh
+# Clean out all ldifs and indices older than 3 months
+ find /opt/backup \
+     -regextype egrep \
+     -regex ".*.ldif|.*agrega-indices[^/]*" \
+     -ctime +90 \
+     | xargs -n 1 rm -rf # -n 1 prevents large numbers of arguments being passed
+#+END_SRC
+*** Remove terminal escape sequences
+e.g. change color output to b+w
+#+BEGIN_SRC sh
+puppetd --test  | perl -pe 's[\x1b.*?;\d+[a-z]][]g'
+#+END_SRC
+** Development
+*** Debugging
+**** Install XDebug with NetBeans
+- apt-get install xdebug (preferably 2.1 for the connect_back feature)
+- add the following to /etc/php5/conf.d/xdebug.ini
+#+BEGIN_SRC conf
+xdebug.remote_enable=on
+xdebug.remote_handler=dbgp
+xdebug.remote_port=9000
+xdebug.remote_connect_back=1
+#+END_SRC
+- Create a new remote PHP project in NetBeans
+- The program should be available on the web under the same path as specified in
+  the project setup.
+- Turn off 'Stop at first line' in Preferences > PHP
+- Right click on the project and select 'Debug'
+** Mail
+*** Exim
+**** Trace sent and received emails
+- Logging docs http://www.exim.org/exim-html-3.20/doc/html/spec_51.html
+- Logs stored in /var/log/exim4
+- Incoming emails will be in the form "<timestamp> <message_id> <= <sender_email>"
+  - Recipients are listed later on in the file with a similar form "<timestamp> <message_id> => <recipient_email>"
+- Using grep, awk and bash, we can easily search for the files of a given
+  recipient/sender e.g. the following which will find all emails sent to Andrew,
+  grab the ids and then search for the senders of each and finally print out the
+  time with the sender:
+  #+BEGIN_SRC sh
+  for f in `grep -R 2011-02-23.*[-=]\>.*user@example.org . | awk '{print $3}'`; do
+      grep -R "$f <[-=]" . | awk '{ print $2," ", $5}' ;
+  done | sort
+  #+END_SRC
+*** Spoof Email
+1. Telnet to recipient on port 25
+2. Announce presence with EHLO <our hostname>
+3. Tell them who it's from with (not brackets) MAIL FROM: <<your email>>
+#+BEGIN_SRC sh
+root@mail:/# telnet mail.example.com 25
+Connected to mail.example.com.
+Escape character is '^]'.
+HE220 mail.example.com ESMTP ready at Mon, 21 Mar 2011 17:43:03 +0000
+EHLO siriusit.co.uk
+500 Command not recognized
+EHLO siriusit.co.uk
+250-mail.example.com
+250-SIZE 20480000
+250-PIPELINING
+250-8BITMIME
+250-CHUNKING
+250 EHLO siriusit.co.uk
+MAIL FROM: steve.challis@siriusit.co.uk
+501 Address Syntax Error in steve.challis@siriusit.co.uk
+MAIL FROM: <steve.challis@siriusit.co.uk>
+553 The sender is spoofed.
+#+END_SRC
+** Diagnosis
+*** Process histogram
+#+BEGIN_SRC sh
+ps -eofname | sort | uniq -c | sort -nr | head
+#+END_SRC
+** Networking
+*** Firewall
+- Usually edit =/etc/init.d/iptables= to add in new rules
+- Some virtuals have they own firwall running so remember to modify both the
+  host and guest
+- =/etc/init.d/iptables stop;/etc/init.d/iptables start=
+- Log to syslog with =iptables -A FORWARD -p tcp -j LOG --log-level debug=
+*** DNS
+**** Reserve IP (static)
+- Typically add reverse DNS entry for it in =/etc/bind/zones/rev.<whatever>=
+- .jnl files are incremental change files (journals) that can become out of sync
+  if you modify the originals without stopping the server. To stop them becoming
+  out of sync, stop the server before making changes.
+*** Find all connections to a given port (e.g 993)
+The awk program finds all established connections with a local port 993 socket
+and prints out the remote client with their port removed.
+#+BEGIN_SRC sh
+# Grab all tcp connections, must sudo to get program name
+sudo netstat -tanp |
+	awk '/ESTABLISHED/ && $4 ~ ":143$" { split($5,a,":"); print a[1] }' |
+	sort | uniq -c
+	sort -nr | head
+#+END_SRC
+** Security
+*** Search for expiring SSL certificates from master
+#+BEGIN_SRC sh
+BASE='/usr/lib/ssl/misc/*.CA'
+join -1 1 -2 3 <(grep -R "Not After" $BASE/newcerts/ | sed 's;.*/\(.*\)\.pem:;\1;') <(cat $BASE/index.txt)
+#+END_SRC
+*** Update Aptitude GPG key
+The update-debian-mirror script can give errors when the Debian certificates
+expire. An error like the following can appear:
+gpgv: Signature made Wed 23 Feb 2011 12:12:32 GMT using RSA key ID 473041FA
+[GNUPG:] ERRSIG AED4B06F473041FA 1 2 00 1298463152 9
+[GNUPG:] NO_PUBKEY AED4B06F473041FA
+gpgv: Can't check signature: public key not found
+gpgv: Signature made Wed 23 Feb 2011 12:12:31 GMT using RSA key ID 473041FA
+[GNUPG:] ERRSIG AED4B06F473041FA 1 2 00 1298463151 9
+[GNUPG:] NO_PUBKEY AED4B06F473041FA
+gpgv: Can't check signature: public key not found
+Errors:
+ Release signature does not verify.
+ Release signature does not verify.
+Failed to download some Release or Release.gpg files!?
+
+- Download the new key
+  - =gpg --keyserver pgp.mit.edu --recv-keys AED4B06F473041FA=
+- Add the keyring to apt
+- =gpg --armor --export AED4B06F473041FA | apt-key add -=
+- Update apt
+  - =apt-get update=
+- Symlink =~/.gnupg/pubring.gpg= to =~/.gnupg/trustedkeys.gpg=
+** OS Installations
+*** debootstrap
+**** Note
+debootstrap is quite different from cdebootstrap
+**** Procedure
+#+BEGIN_SRC sh
+mkfs -t ext3 /dev...
+mount /dev... /mnt/tmp
+# cdebootstrap does not work
+debootstrap squeeze /mnt/tmp http://debiam-mirror/debian
+vim /etc/network/interfaces
+vim /etc/resolve.conf
+vim /etc/fstab # Must set for Lenny
+chroot /mnt/tmp
+apt-get install openssh-server, locales, linux-headers-2.6.32-5-xen-636
+vim /etc/locale.gen	# uncommend en_GB UTF8
+locale-gen
+#+END_SRC
+*** Xen notes
+- use libvirt to as root (xvda1 rather than sda1)
+- Modify /etc/securetty to add xen tty (hvc0, newer debians have this)
+- mount and passwd to set root password
+- vim /etc/inittab
+  - change login tty1 to hvc0
+- use the correct vif, may need to be set to use the bridge
+  - brctl will show the bridges
+  - ifconfig shows the various vif's and their ids
+- Lenny required the root (in the xen config) to be set to /dev/sda1 unlike
+  squeeze which can use xvda1
+** Software Installation 
+*** Get Versions of specific packages
+Use emacs macro to filter (through keep-lines and replace-regexp) the output of
+the apt dependency error message. Pass to dpkg.
+#+BEGIN_SRC sh
+dpkg -l | egrep "php5|php5-cli|apache2-mpm-wo...
+#+END_SRC
+** Samba
+*** TDB modification
+- tdbdump <database.tdb>
+- If the key contains spaces then they must be backslash escaped. Some keys are
+  added with a trailing 0 and these can be deleted by appending \0 to the delete
+  command
+** LDAP
+*** Set user LDAP password with ldif
+1. Get the existing data (including hashed password) with ldapsearch
+   #+BEGIN_SRC sh
+   ldapsearch -b 'uid=steve.challis@siriusit.co.uk,ou=people,o=Sirius Corporation,ou=organizations,dc=example,dc=org' -D 'cn=admin,dc=example,dc=org' -xW '*'
+   #+END_SRC
+2. Create an ldif file (man ldapmodify may be of use here)
+   #+BEGIN_SRC sh
+   dn: uid=steve.challis@siriusit.co.uk,ou=people,o=Sirius Corporation,ou=organizations,dc=example,dc=org
+   changetype: modify
+   replace: userPassword
+   userPassword:: <password hash>
+   #+END_SRC
+3. Load the ldif changes (performing a search before and after to check it worked)
+   #+BEGIN_SRC sh
+   ldapmodify -D 'cn=admin,dc=example,dc=org' -f change.ldif -xW
+   #+END_SRC
+*** Upgrade slapd server
+**** Example
+#+INCLUDE: "~/org/ldap-upgrade.org"
+*** Search bzipd ldap logs for membership of a group
+#+BEGIN_SRC sh
+for f in backup_2011-02-11_*.bz2; do
+        bzcat $f \
+        | grep -A 60 'dn: cn=my-group-participants' \
+        | grep someone > /dev/null
+        if [ "$?" -eq "0" ]; then
+                echo $f;
+        fi;
+done;
+#+END_SRC
+** iSCSI
+*** Creating and connecting to a new shared target on the fly
+1. Create LV on store (heset)
+2. Create new target in /etc/iet/ietd.conf with the LV as a LUN and a 16 char
+   max unique scsiid. Also create a new password for this target.
+3. Add LUN dynamically
+   ietadm --op new --tid=5 --lun=0 --params='Path=/dev/sirius_store/menhittest,Type=fileo,ScsiId=MENHITTEST'
+4. Reload iscsitarget /etc/init.d/iscsitarget restart
+5. Add password details  =/etc/iscsi/iscsi.conf=
+6. Rediscover =iscsiadm -m discovery -t sendtargets -p 192.168.2.10=
+7. On new machine (menhit) rescan =iscsiadm -m session -R=
+8. Restart open-iscsi =/etc/init.d/open-iscsi restart=
+9. Device appears in /dev/heset thanks to udev rules
+
+
+=cat /proc/net/iet/volume=
+1. =/lib/udev/scsi_vendor_id=
+2. =dpkg -c /tmp/heset-udev-rules_20101116_all.deb=
+3. =apt-get install tgt=
+4. =/lib/udev/scsi_vendor_id /dev/sda=
+5. =cat /lib/udev/rules.d/60-heset-iscsi.rules=
+
+Udev operates on complete volume e.g. =/dev/sda=. =/etc/init.d/iscsi restart= is
+quick enough to not disturb running virtuals.
+** LVM
+*** Snapshot
+#+BEGIN_SRC sh
+time lvcreate --size 120m --snapshot \
+    --name snap_arcon_opusvl_scratch_root \
+    /dev/vg/arcon_opusvl_scratch_root
+#+END_SRC
+* Editing
+** SLIME
+| C-c C-d C-a       | Slime apropos             |
+| M-x slime-connect | connect to swank instance |
+** Org
+*** Useful shortcuts
+=C-q C-j= to enter raw line break (e.g. for working around org-table-mode)
+=C-c '= to edit #+INCLUDEd code, =M-x ffap= to visit
+*** Org-mode diagrams
+The following is a basic diagram that will be converted to an image and
+displayed inline. We must evaluate the source block with =C-c C-v e= before
+running org-export.
+
+#+BEGIN_SRC dita :file helloworld.png :cmdline -r -s 0.8
+    +--------+          +-----------+
+    |        |          |           |
+    |        +--------->+ Hey Steve |
+    |        |          |           |
+    +--------+          +-----------+
+#+END_SRC
+
+#+results:
+[[file:helloworld.png]]
+*** Evaluating result
+- (Named) results can be moved around
+- Languages must be enabled before evaluation will complete
+#+srcname: testbash
+#+BEGIN_SRC sh :exports both :results output
+# Try C-c C-c on me
+tail /var/log/system.log
+#+END_SRC
+** AWK
+*** Basic syntax
+Awk programs are made up of pattern and operation pairs. Either the pattern or
+the operation may be empty. It is the pattern that decides whether a particular
+line is operated upon and precedes braces which define the logic that is to
+happen for that line. As an example, we can select all rows except the first
+(Numbered Record greater than 1) and print the final column with:
+#+BEGIN_SRC sh
+stevechallis:~$ echo -e "a A \n b B \n c C"| awk 'NR>1 { print $NF }'
+B
+C
+#+END_SRC
+A previous snippet to [[*Find%20all%20connections%20to%20a%20given%20port%20(e.g%20993)][find connections to a given port]] is a more complex example. 
+*** Use comma separated print without spaces between
+#+BEGIN_SRC sh
+awk -v OFS="" '{print $2,"=",$3}'
+#+END_SRC
+** Tramp
+*** Open files from eterm terminal session on remote host
+Put the following in .bash_profile on the remote host:
+#+BEGIN_SRC sh
+# track directory, username, and cwd for remote logons
+if [ $TERM = eterm-color ]; then
+    function eterm-set-cwd {
+        $@
+        echo -e "\033AnSiTc" $(pwd)
+    }
+ 
+    # set hostname, user, and cwd
+    function eterm-reset {
+        echo -e "\033AnSiTu" $(whoami)
+        echo -e "\033AnSiTc" $(pwd)
+        echo -e "\033AnSiTh" $(hostname -f)
+    }
+ 
+    for temp in cd pushd popd; do
+        alias $temp="eterm-set-cwd $temp"
+    done
+ 
+    # set hostname, user, and cwd now
+    eterm-reset
+fi
+#+END_SRC
+** Unicode in Vim and Emacs
+| Emacs          | Vim         | Action                 |
+| M-h M-c        | <normal>ga  | Character under cursor |
+| M-x ucs-insert | <insert>C-v | Insert char by code    |
+|                | C-r C-r "   | Paste yanked text      |
+|                | :digraph    | Show list of codes     |
+* Design Patterns
+** Abstract Factory
+Allows fundamental changes to large systems by modifying only the abstract
+  classes e.g. The Java Look'n'Feel for changing the widget set. This can be
+  done without conditionals, the polymorphism takes care of which concrete
+  classes get used for instantiations.
+
+  (Generic example image)
+
+  [[file:AbstractFactory.gif]]
+** Monads
+A High level abstraction for threading the result of each given function into
+the next. Flattens out nested function calls.
+http://onclojure.com/2009/03/05/a-monad-tutorial-for-clojure-programmers-part-1/
+http://intensivesystems.net/tutorials/monads_101.html
+* Bash
+** Verify/validate user entered data
+#+BEGIN_SRC sh
+ echo -n "Is this correct? (y/n): "
+    read verify
+    if [ ! $verify == 'y' ]
+    then
+        echo Aborting ...
+        exit 1
+    fi
+}
+
+# $1 Question to ask
+# $2 Regex for validation of input
+# $3 Variable to store result
+function ask_for_data {
+    while true; do
+        echo -n $1
+        read DATA
+        if [ $(echo $DATA | grep -E $2 -) ]
+            then break
+        else
+            echo "Not valid ..."
+        fi
+    done
+    eval $3="'$DATA'"
+}
+
+ask_for_data "Please enter a username:" "^[a-z]+$" "USERNAME"
+#+END_SRC
+** Find expiry dates of all pem certificates on a system
+#+BEGIN_SRC sh
+for f in `locate *.pem`; do if grep -q "Not After" $f ; then echo "| $f | $(grep 'Not After' $f) |"; fi ; done
+#+END_SRC
+** History expansion
+*** Get last word of last command beginning with 'cp'
+ cd !cp:$
+** Change directory to path output by locate (Problems with unstringified output!)
+cd "$(dirname "$(locate netbeans.clusters | tr -d '\n')")"
