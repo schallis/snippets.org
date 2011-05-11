@@ -24,8 +24,10 @@ ps -ylC httpd --sort:rss
 sudo puppetd --test --no-noop
 #+END_SRC
 *** Clear out old certificates (e.g. after reinstall)
-**** Client =rm /var/lib/puppet/ssl=
-**** Server =puppetca --clear <FQDN>=
+**** Client
+    =rm /var/lib/puppet/ssl=
+**** Server
+    =puppetca --clear <FQDN>=
 *** URIs
 Use =puppet:///myfile= to reference a file on the puppetmaster
 ** Virtualisation
@@ -185,7 +187,7 @@ join -1 1 -2 3 <(grep -R "Not After" $BASE/newcerts/ | sed 's;.*/\(.*\)\.pem:;\1
 *** Update Aptitude GPG key
 The update-debian-mirror script can give errors when the Debian certificates
 expire. An error like the following can appear:
-#+BEGIN_SRC txt
+#+BEGIN_SRC sh 
 gpgv: Signature made Wed 23 Feb 2011 12:12:32 GMT using RSA key ID 473041FA
 [GNUPG:] ERRSIG AED4B06F473041FA 1 2 00 1298463152 9
 [GNUPG:] NO_PUBKEY AED4B06F473041FA
@@ -312,10 +314,9 @@ time lvcreate --size 120m --snapshot \
 #+END_SRC
 * Editing
 ** SLIME
-|-------------------|---------------------------|
+| Command           | Action                    |
 | C-c C-d C-a       | Slime apropos             |
 | M-x slime-connect | connect to swank instance |
-|-------------------|---------------------------|
 ** Org
 *** Useful shortcuts
 =C-q C-j= to enter raw line break (e.g. for working around org-table-mode)
@@ -338,7 +339,7 @@ running org-export.
 *** Evaluating result
 - (Named) results can be moved around
 - Languages must be enabled (e.g. in =.emacs=) before evaluation will complete: 
-  #+BEGIN_SRC elisp
+  #+BEGIN_SRC lisp
   (org-babel-do-load-languages
    'org-babel-load-languages
    '((emacs-lisp . nil)

@@ -11,7 +11,7 @@ problem, particularly if the details were important. This `org-mode
 been and will continue to be collected over a period of years in a systems
 administration and software development context.
 
-It is my hope that this will file evolve and provoke discussion as it is
+It is my hope that this file will evolve and provoke discussion as it is
 shared so that it may enhance the toolbox of whomever chooses to read it.
 
 Whilst this file can be enjoyed and edited using any text editor, a suitable
