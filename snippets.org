@@ -1,4 +1,17 @@
 * General
+** Quickest way to write hello world program?
+#+BEGIN_SRC sh
+echo -e '#!/bin/sh\necho hello world' > hello
+#+END_SRC
+or on unix systems where the shebang line is unecessary
+#+BEGIN_SRC sh
+echo echo hello world > hello
+#+END_SRC
+Using emacs mode on the command line, C-w and C-y can reduce typing
+** Tab complete previously used ssh servers
+#+BEGIN_SRC sh
+complete -W "$(echo `cat ~/.ssh/known_hosts | cut -f 1 -d ' ' | sed -e s/,.*//g | uniq | grep -v "\["`;)" ssh
+#+END_SRC
 ** Generate TAGS file for method/function lookup
 The resulting file can be used by your editor to search and navigate large
 codebases in an efficient manner.
@@ -12,6 +25,19 @@ stevechallis$ pipe() { python -c 'print chr(0x7c)'; }
 stevechallis$ egrep "net`pipe`ssh" /var/log/dmesg
 #+END_SRC
 * Systems administration
+** SSH
+*** Problems with opening tunnels
+- e.g. channel 5: open failed: administratively prohibited: open failed
+- check /etc/ssh/sshd_config for disabled forwarding
+*** ssl encrypted telnet equivalent
+Shoes certificate request and then behaves just like telnet
+#+BEGIN_SRC sh
+openssl s_client -connect localhost:10443
+> GET / HTTP/1.0
+> 
+>
+#+END_SRC
+
 ** Web
 *** Apache processes
 **** Find the average process size in kilobytes
@@ -70,10 +96,18 @@ stevechallis:source$ find . -name "*.py"
 #+END_SRC
 *** Recursively list process parents
 #+BEGIN_SRC sh
-  parents(){ :(){
+parents(){ :(){
           read p n <<<`ps -o ppid,comm -p $1 | awk 'NR>1{print $1,$2}'`;
           echo -e "$1\t$n";
-          test $1 -ne 0 && : $p; }; : $1; }
+          test $1 -ne 0 && : $p; };
+  : $1; }
+#+END_SRC
+Improvements from Affan Salman include moving the tail recursion up:
+#+BEGIN_SRC sh
+lspp() {
+    test $1 -gt 1 && \
+        (p=`ps -o ppid= -p $1`; echo -e "$p `ps -o comm= -p $p`"; lspp $p;)
+};
 #+END_SRC
 *** Trim old backups by cron
 #+BEGIN_SRC sh
@@ -251,6 +285,15 @@ dpkg -l | egrep "php5|php5-cli|apache2-mpm-wo...
   added with a trailing 0 and these can be deleted by appending \0 to the delete
   command
 ** LDAP
+*** Ldapsearch
+#+BEGIN_SRC sh
+ldapsearch -x -W -h v-misc-0 -p 389                    \
+       -D 'uid=antony.stone,ou=People,dc=gradwell,dc=com' \
+       -b 'ou=Hosts,dc=gradwell,dc=com' -LLL              \
+       '(cn=*.mcr1.gradwell.com)' puppetclass puppetvar
+#+END_SRC
+*** General Documentation
+http://www.openldap.org/doc/admin24/dbtools.html
 *** Set user LDAP password with ldif
 1. Get the existing data (including hashed password) with ldapsearch
    #+BEGIN_SRC sh
@@ -414,10 +457,16 @@ Allows fundamental changes to large systems by modifying only the abstract
 ** Monads
 A High level abstraction for threading the result of each given function into
 the next. Flattens out nested function calls.
+*** Details discussions
 - [[http://onclojure.com/2009/03/05/a-monad-tutorial-for-clojure-programmers-part-1/][onclojure.com]]
 - [[http://intensivesystems.net/tutorials/monads_101.html][intensivesystems.net]]
 * Bash
+** Replace expression in all files in a directory
+#+BEGIN_SRC sh
+find . -type f | xargs perl -pe 's/mcr1_//g' -i
+#+END_SRC
 ** Verify/validate user entered data
+                                    
 #+BEGIN_SRC sh
  echo -n "Is this correct? (y/n): "
     read verify

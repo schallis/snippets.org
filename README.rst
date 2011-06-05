@@ -2,7 +2,7 @@
 snippets.org
 ============
 :Info: A collection of useful/interesting code snippets and notes
-:Authors: Steve Challis (http://schallis.com)
+:Authors: Steve Challis (http://schallis.com) and friends/colleagues
 :Requires: Incurable curiosity
 
 It is often useful to keep code snippets and instructions whenever you solve a
