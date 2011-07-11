@@ -1,72 +1,194 @@
 * General
+
 ** Quickest way to write hello world program?
+
+This is a challenge set by [[http://www.nestoria.co.uk/][Nestoria]] at the Silicon Milkroundabout
+meetup in 2011. Participants are presented with a standard Ubuntu
+terminal and tasked with writing a program that can be executed and
+print "hello world". Any method and programming language can be used.
+
 #+BEGIN_SRC sh
 echo -e '#!/bin/sh\necho hello world' > hello
 #+END_SRC
+
 or on unix systems where the shebang line is unecessary
+
 #+BEGIN_SRC sh
 echo echo hello world > hello
 #+END_SRC
+
 Using emacs mode on the command line, C-w and C-y can reduce typing
+
 ** Tab complete previously used ssh servers
+
 #+BEGIN_SRC sh
 complete -W "$(echo `cat ~/.ssh/known_hosts | cut -f 1 -d ' ' | sed -e s/,.*//g | uniq | grep -v "\["`;)" ssh
 #+END_SRC
+
 ** Generate TAGS file for method/function lookup
+
 The resulting file can be used by your editor to search and navigate large
 codebases in an efficient manner.
+
 #+BEGIN_SRC sh
 find {client_web,server} -name '*.py' | grep -v "/build/" | etags --output TAGS -
 #+END_SRC
+
 ** Keyboard buggered?
+
 Example usage of the pipe character without using the pipe key:
+
 #+BEGIN_SRC sh
 stevechallis$ pipe() { python -c 'print chr(0x7c)'; }
 stevechallis$ egrep "net`pipe`ssh" /var/log/dmesg
 #+END_SRC
+
 * Systems administration
+
 ** SSH
+
 *** Problems with opening tunnels
+
 - e.g. channel 5: open failed: administratively prohibited: open failed
 - check /etc/ssh/sshd_config for disabled forwarding
+
+*** Run command on multiple servers
+
+We utilise the -n parameter to run ssh for each line passed in and use
+the -J parameter to specify the position of the substitution.
+
+#+begin_src src
+echo v-{server1,server2}.example.com | xargs -n 1 -J % ssh % grep ip /etc/hosts
+#+end_src
+
 *** ssl encrypted telnet equivalent
+
 Shoes certificate request and then behaves just like telnet
+
 #+BEGIN_SRC sh
 openssl s_client -connect localhost:10443
 > GET / HTTP/1.0
-> 
+>
 >
 #+END_SRC
 
+** Certificates
+
+*** Generate new key, csr and cert
+
+#+BEGIN_SRC
+# Check existing certificate if needed
+openssl openssl rsa -in /etc/ssl/exim/exim.key -text
+# Generate private key
+openssl genrsa -out /tmp/mail.siriusit.co.uk.key 2048
+# Generate signing request to send to CA
+openssl req -key /tmp/mail.siriusit.co.uk.key -out /tmp/mail.siriusit.co.uk.csr
+# Grab the certificate from CA and paste into .crt then check details
+openssl x509 -in /tmp/mail.siriusit.co.uk.crt -text
+#+END_SRC
+
+** Logging
+
+*** Syslog
+
+Syslog is a general framework for logging. Programs can output to syslog and
+from there the output can be filtered and sent to various places (e.g. over a
+network or to individual files). Syslog also has standard methods for dealing
+with multiline logs etc.
+
+*** Log analysers
+
+**** pgFouine
+
+- Can track all queries that exceed the time specified in the pg config
+- Gives a high level overview of patterns, groups entries and
+  generates graphs
+
+**** SEC - simple event correlator
+
+http://simple-evcorr.sourceforge.net/
+
 ** Web
+
 *** Apache processes
+
 **** Find the average process size in kilobytes
+
 #+BEGIN_SRC sh
 ps -ylC httpd --sort:rss
 #+END_SRC
+
 ** Puppet
+
 *** Reload manifest from master
+
 #+BEGIN_SRC sh
 sudo puppetd --test --no-noop
 #+END_SRC
+
 *** Clear out old certificates (e.g. after reinstall)
+
 **** Client
-    =rm /var/lib/puppet/ssl=
+
+=rm /var/lib/puppet/ssl=
+
 **** Server
-    =puppetca --clear <FQDN>=
+
+=puppetca --clear <FQDN>=
+
 *** URIs
+
 Use =puppet:///myfile= to reference a file on the puppetmaster
-** Virtualisation
+
+** Visrtualisation
+
+*** Summary
+
+**** Hypervisors
+
+The Hypervisor manages the virtualisation process and interaction with the
+hardware. There are two levels, level 1 e.g. Xen which runs on bare
+metal and is a minimal install, and level 2 e.g KVM which runs on top
+of another operating system e.g. Debian.
+
+**** KVM/Qemu
+
+Debian Squeeze ships with Kernel based support for KVM so all that's
+needed is to install and emulator (QEMU) and possibly Virsh to make
+management easier.
+
+***** Networking
+
+A virtual network bridge needs to be created for which we need the
+bridge-utils package. 
+
+The bridge br0 should be configured in /etc/network/interfaces with
+the same IP address as the eth0 as it will replace it. A bridge_fd of
+9 inexplicable works well.
+
+**** Xen
+
+Xen is both a hypervisor and emulator. A minimal operating system is
+installed on bare metal which supports the first real operating where
+you can manage guests (the host or Dom0 in Xen terminology). The Dom0
+is what we log into to setup guests (the DomU's).
+
 *** Check for hardware support
+
 vmx on intel, svm on amd
+
 #+BEGIN_SRC sh
 egrep '(vmx|svm)' /proc/cpuinfo
 #+END_SRC
+
 ** Shell scripting
+
 *** Globbing/Bash expansion
+
 It is important to recognize the effects of wildcard expansion as it can easily
 produce unexpected results. Rsync is also another utility to watch out for
 specifically.
+
 #+BEGIN_SRC sh
 stevechallis:source$ tree
 .
@@ -94,7 +216,9 @@ stevechallis:source$ find . -name "*.py"
 ./3/test2.py
 ./python.py
 #+END_SRC
+
 *** Recursively list process parents
+
 #+BEGIN_SRC sh
 parents(){ :(){
           read p n <<<`ps -o ppid,comm -p $1 | awk 'NR>1{print $1,$2}'`;
@@ -102,46 +226,64 @@ parents(){ :(){
           test $1 -ne 0 && : $p; };
   : $1; }
 #+END_SRC
+
 Improvements from Affan Salman include moving the tail recursion up:
+
 #+BEGIN_SRC sh
 lspp() {
     test $1 -gt 1 && \
         (p=`ps -o ppid= -p $1`; echo -e "$p `ps -o comm= -p $p`"; lspp $p;)
 };
 #+END_SRC
+
 *** Trim old backups by cron
+
 #+BEGIN_SRC sh
-# Clean out all ldifs and indices older than 3 months
- find /opt/backup \
-     -regextype egrep \
-     -regex ".*.ldif|.*indices[^/]*" \
-     -ctime +90 \
-     | xargs -n 1 rm -rf # -n 1 prevents large numbers of arguments being passed
+  # Clean out all ldifs and indices older than 3 months
+   find /opt/backup \
+       -regextype egrep \
+       -regex ".*.ldif|.*indices[^/]*" \
+       -ctime +90 \
+       | xargs -an 1 rm -rf # -n 1 prevents large numbers of arguments being passed |
 #+END_SRC
+
 *** Remove terminal escape sequences
-e.g. change color output to b+w
+
+To change color output to b+w. Useful when you have wacky terminal
+background colors.
+
 #+BEGIN_SRC sh
 puppetd --test  | perl -pe 's[\x1b.*?;\d+[a-z]][]g'
 #+END_SRC
+
 ** Development
+
 *** Debugging
+
 **** Install XDebug with NetBeans
+
 - apt-get install xdebug (preferably 2.1 for the connect_back feature)
 - add the following to /etc/php5/conf.d/xdebug.ini
+
 #+BEGIN_SRC conf
 xdebug.remote_enable=on
 xdebug.remote_handler=dbgp
 xdebug.remote_port=9000
 xdebug.remote_connect_back=1
 #+END_SRC
+
 - Create a new remote PHP project in NetBeans
 - The program should be available on the web under the same path as specified in
   the project setup.
 - Turn off 'Stop at first line' in Preferences > PHP
 - Right click on the project and select 'Debug'
+
 ** Mail
+
 *** Exim
+
 **** Trace sent and received emails
+
 - Logging docs http://www.exim.org/exim-html-3.20/doc/html/spec_51.html
 - Logs stored in /var/log/exim4
 - Incoming emails will be in the form "<timestamp> <message_id> <= <sender_email>"
@@ -150,15 +292,19 @@ xdebug.remote_connect_back=1
   recipient/sender e.g. the following which will find all emails sent to Andrew,
   grab the ids and then search for the senders of each and finally print out the
   time with the sender:
+
   #+BEGIN_SRC sh
   for f in `grep -R 2011-02-23.*[-=]\>.*user@example.org . | awk '{print $3}'`; do
       grep -R "$f <[-=]" . | awk '{ print $2," ", $5}' ;
   done | sort
   #+END_SRC
+
 *** Spoof Email
+
 1. Telnet to recipient on port 25
 2. Announce presence with EHLO <our hostname>
 3. Tell them who it's from with (not brackets) MAIL FROM: <<your email>>
+
 #+BEGIN_SRC sh
 root@mail:/# telnet mail.example.com 25
 Connected to mail.example.com.
@@ -178,50 +324,90 @@ MAIL FROM: steve.challis@siriusit.co.uk
 MAIL FROM: <steve.challis@siriusit.co.uk>
 553 The sender is spoofed.
 #+END_SRC
+
 ** Diagnosis
+
 *** Process histogram
+
 #+BEGIN_SRC sh
 ps -eofname | sort | uniq -c | sort -nr | head
 #+END_SRC
+
 *** Resource usage
+
 Check the IO and CPU usage to pin down where a problem may be occuring e.g. high
 processor wait may indicate IO problems.
 #+BEGIN_SRC sh
 vmstat 1
 #+END_SRC
+
 ** Networking
+
 *** Firewall
+
 - Usually edit =/etc/init.d/iptables= to add in new rules
 - Some virtuals have they own firwall running so remember to modify both the
   host and guest
 - =/etc/init.d/iptables stop;/etc/init.d/iptables start=
-- Log to syslog with =iptables -A FORWARD -p tcp -j LOG --log-level debug=
+- Log to syslog with =iptables -A FORWARD -p tcp -j LOG --log-level
+  debug=
+
 *** DNS
+
 **** Reserve IP (static)
+
 - Typically add reverse DNS entry for it in =/etc/bind/zones/rev.<whatever>=
 - .jnl files are incremental change files (journals) that can become out of sync
   if you modify the originals without stopping the server. To stop them becoming
   out of sync, stop the server before making changes.
+
 *** Find all connections to a given port (e.g 993)
+
 The awk program finds all established connections with a local port 993 socket
 and prints out the remote client with their port removed.
+
 #+BEGIN_SRC sh
 # Grab all tcp connections, must sudo to get program name
 sudo netstat -tanp |
-	awk '/ESTABLISHED/ && $4 ~ ":143$" { split($5,a,":"); print a[1] }' |
-	sort | uniq -c
-	sort -nr | head
+        awk '/ESTABLISHED/ && $4 ~ ":143$" { split($5,a,":"); print a[1] }' |
+        sort | uniq -c |
+        sort -nr | head
 #+END_SRC
+
+*** Audibly detect machine ping response
+
+Particularly useful when you are waiting for a server to come up but
+you have no idea how long it might take e.g. when a machine is fscking
+itself.
+
+#+BEGIN_SRC sh
+ping -a -i 30 <address>
+#+END_SRC
+
+*** Host discovery using nmap
+
+Find all pingable hosts on the 10.1.192 range
+
+#+BEGIN_SRC sh
+nmap -v -sP 10.1.192.0/24
+#+END_SRC
+
 ** Security
+
 *** Search for expiring SSL certificates from master
+
 #+BEGIN_SRC sh
 BASE='/usr/lib/ssl/misc/*.CA'
 join -1 1 -2 3 <(grep -R "Not After" $BASE/newcerts/ | sed 's;.*/\(.*\)\.pem:;\1;') <(cat $BASE/index.txt)
 #+END_SRC
+
 *** Update Aptitude GPG key
+
 The update-debian-mirror script can give errors when the Debian certificates
 expire. An error like the following can appear:
-#+BEGIN_SRC sh 
+
+#+BEGIN_SRC sh
+
 gpgv: Signature made Wed 23 Feb 2011 12:12:32 GMT using RSA key ID 473041FA
 [GNUPG:] ERRSIG AED4B06F473041FA 1 2 00 1298463152 9
 [GNUPG:] NO_PUBKEY AED4B06F473041FA
@@ -235,6 +421,7 @@ Errors:
  Release signature does not verify.
 Failed to download some Release or Release.gpg files!?
 #+END_SRC
+
 - Download the new key
   - =gpg --keyserver pgp.mit.edu --recv-keys AED4B06F473041FA=
 - Add the keyring to apt
@@ -242,11 +429,17 @@ Failed to download some Release or Release.gpg files!?
 - Update apt
   - =apt-get update=
 - Symlink =~/.gnupg/pubring.gpg= to =~/.gnupg/trustedkeys.gpg=
+
 ** OS Installations
+
 *** debootstrap
+
 **** Note
+
 debootstrap is quite different from cdebootstrap
+
 **** Procedure
+
 #+BEGIN_SRC sh
 mkfs -t ext3 /dev...
 mount /dev... /mnt/tmp
@@ -257,10 +450,12 @@ vim /etc/resolve.conf
 vim /etc/fstab # Must set for Lenny
 chroot /mnt/tmp
 apt-get install openssh-server, locales, linux-headers-2.6.32-5-xen-636
-vim /etc/locale.gen	# uncommend en_GB UTF8
+vim /etc/locale.gen     # uncommend en_GB UTF8
 locale-gen
 #+END_SRC
+
 *** Xen notes
+
 - use libvirt to as root (xvda1 rather than sda1)
 - Modify /etc/securetty to add xen tty (hvc0, newer debians have this)
 - mount and passwd to set root password
@@ -271,49 +466,90 @@ locale-gen
   - ifconfig shows the various vif's and their ids
 - Lenny required the root (in the xen config) to be set to /dev/sda1 unlike
   squeeze which can use xvda1
-** Software Installation 
+
+** Software Installation
+
 *** Get Versions of specific packages
+
 Use emacs macro to filter (through keep-lines and replace-regexp) the output of
 the apt dependency error message. Pass to dpkg.
+
 #+BEGIN_SRC sh
 dpkg -l | egrep "php5|php5-cli|apache2-mpm-wo...
 #+END_SRC
+
 ** Samba
+
 *** TDB modification
+
 - tdbdump <database.tdb>
 - If the key contains spaces then they must be backslash escaped. Some keys are
   added with a trailing 0 and these can be deleted by appending \0 to the delete
   command
+
 ** LDAP
+
 *** Ldapsearch
+
 #+BEGIN_SRC sh
 ldapsearch -x -W -h v-misc-0 -p 389                    \
        -D 'uid=antony.stone,ou=People,dc=gradwell,dc=com' \
-       -b 'ou=Hosts,dc=gradwell,dc=com' -LLL              \
+       -b 'ou=Hosts,dc=gradwell,dc=com'             \
        '(cn=*.mcr1.gradwell.com)' puppetclass puppetvar
 #+END_SRC
+
 *** General Documentation
-http://www.openldap.org/doc/admin24/dbtools.html
+
+http://www.openldap.org/doc/admin24/dbtools.
+
+*** Diagnose refused connection
+
+- Check host (-H/-h), base (-b) and bind DN (-D) are correct
+- Check firewalling on client and server
+
+#+BEGIN_SRC sh
+iptables -L
+iptables -t nat -L
+#+END_SRC
+
+- Check /etc/ldap/ldap.conf on the client for and TLS options and certs
+- Use telnet (on 389/636 as appropriate) to test connection
+- Use host to check ip the names resolve to, sub in to ldapsearch
+- Check /etc/resolve.conf for missing domain attribute. This can cause
+  the SSL cert to be rejected because the hostnames do not match
+
 *** Set user LDAP password with ldif
+
 1. Get the existing data (including hashed password) with ldapsearch
+
    #+BEGIN_SRC sh
-   ldapsearch -b 'uid=steve.challis@siriusit.co.uk,ou=people,o=Sirius Corporation,ou=organizations,dc=example,dc=org' -D 'cn=admin,dc=example,dc=org' -xW '*'
+   ldapsearch -D 'uid=steve.challis@siriusit.co.uk,ou=people,o=Sirius Corporation,ou=organizations,dc=example,dc=org' -b 'cn=admin,dc=example,dc=org' -xW '*'
    #+END_SRC
+
 2. Create an ldif file (man ldapmodify may be of use here)
+
    #+BEGIN_SRC sh
    dn: uid=steve.challis@siriusit.co.uk,ou=people,o=Sirius Corporation,ou=organizations,dc=example,dc=org
    changetype: modify
    replace: userPassword
    userPassword:: <password hash>
    #+END_SRC
-3. Load the ldif changes (performing a search before and after to check it worked)
+
+3. Load the ldif changes (performing a search before and after to
+   check it worked)
+
    #+BEGIN_SRC sh
    ldapmodify -D 'cn=admin,dc=example,dc=org' -f change.ldif -xW
    #+END_SRC
+
 *** Upgrade slapd server
+
 **** Example
+
 #+INCLUDE: "~/org/ldap-upgrade.org"
+
 *** Search bzipd ldap logs for membership of a group
+
 #+BEGIN_SRC sh
 for f in backup_2011-02-11_*.bz2; do
         bzcat $f \
@@ -324,8 +560,11 @@ for f in backup_2011-02-11_*.bz2; do
         fi;
 done;
 #+END_SRC
+
 ** iSCSI
+
 *** Creating and connecting to a new shared target on the fly
+
 1. Create LV on store (heset)
 2. Create new target in /etc/iet/ietd.conf with the LV as a LUN and a 16 char
    max unique scsiid. Also create a new password for this target.
@@ -338,7 +577,6 @@ done;
 8. Restart open-iscsi =/etc/init.d/open-iscsi restart=
 9. Device appears in /dev/heset thanks to udev rules
 
-
 =cat /proc/net/iet/volume=
 1. =/lib/udev/scsi_vendor_id=
 2. =dpkg -c /tmp/heset-udev-rules_20101116_all.deb=
@@ -348,23 +586,119 @@ done;
 
 Udev operates on complete volume e.g. =/dev/sda=. =/etc/init.d/iscsi restart= is
 quick enough to not disturb running virtuals.
+
 ** LVM
+
 *** Snapshot
+
 #+BEGIN_SRC sh
 time lvcreate --size 120m --snapshot \
     --name snap_arcon_opusvl_scratch_root \
     /dev/vg/arcon_opusvl_scratch_root
 #+END_SRC
+
+* Programming
+
+** Lisp
+
+*** SBCL
+#+BEGIN_SRC
+
+M-x run-lisp
+(require 'asdf)
+(require 'asdf-install)
+(asdf-install:install 'swank)
+(require 'swank)
+(swank:create-server :port 4005)
+#+END_SRC
+
+*** Chicken scheme
+
+http://code.call-cc.org/
+
+#+BEGIN_SRC sh
+wget http://code.call-cc.org/bootstrap/chicken-boot-4.6.6-macosx-x86-64.bz2
+# Modify Makefile.macosx to hardcode x86-64 as the ARCH
+make CHICKEN=chicken-boot-4.6.6-macosx-x86-6 PLATFORM=macosx
+sudo chicken-install chicken-doc
+cd `csi -p '(chicken-home)'`
+curl http://3e8.org/pub/chicken-doc/chicken-doc-repo.tgz | sudo tar zx
+sudo chicken-install slime
+# In emacs config
+(add-to-list 'load-path "/usr/local/lib/chicken/5")
+(autoload 'chicken-slime "chicken-slime" "SWANK backend for Chicken" t)
+(add-hook 'scheme-mode-hook (lambda () (slime-mode t)))
+# Run slime
+M-x chicken-slime
+#+END_SRC
+
+*** CVS Slime Checkout
+
+#+BEGIN_SRC
+# in CVS repo
+cvs -d:pserver:anonymous@common-lisp.net:/project/slime/cvsroot login
+cvs -d:pserver:anonymous@common-lisp.net:/project/slime/cvsroot update -RdPC
+#+END_SRC
+
+Password is 'anonymous'
+
+** Version control
+
+*** Rebase
+
+#+BEGIN_SRC sh
+# Clone the remote repo
+git clone http://schallis@git.siriusit.co.uk/git/gosa.git
+# Checkout the new remote branch anonymously
+git checkout remotes/origin/2.7.1
+# Place checkout in local branch
+git checkout -b 2.7.1-sirius-limo
+# Checkout the old branch we want to rebase
+git checkout remotes/origin/tags/2.6.12-sirius-limo
+git checkout -b 2.6.12-sirius-limo
+# Local branches should now look something like this
+limo-dev$ git branch
+ * 2.6.12-sirius-limo
+   2.7.1-sirius-limo
+   trunk
+git rebase 2.7.1-sirius-limo
+# HEAD commits should mostly be the ones you want when git finds a CONFLICT
+#+END_SRC
+
 * Editing
+
+** Emacs
+
+*** Use eterm on remote box
+
+Most remote boxes will not have the eterm profile installed and so you
+may experience problems when shelled in using Emacs. Luckily this is
+easy to install for the user you are logged in as.
+
+The users' home directory structure should look like this:
+
+#+begin_src sh
+/root/.terminfo/
+`-- e
+    |-- eterm-color
+    `-- eterm-color.ti
+#+end_src
+
 ** SLIME
+
 | Command           | Action                    |
 | C-c C-d C-a       | Slime apropos             |
 | M-x slime-connect | connect to swank instance |
+
 ** Org
+
 *** Useful shortcuts
+
 =C-q C-j= to enter raw line break (e.g. for working around org-table-mode)
 =C-c '= to edit #+INCLUDEd code, =M-x ffap= to visit
+
 *** Org-mode diagrams
+
 The following is a basic diagram that will be converted to an image and
 displayed inline. We must evaluate the source block with =C-c C-v e= before
 running org-export.
@@ -379,42 +713,58 @@ running org-export.
 
 #+results:
 [[file:helloworld.png]]
+
 *** Evaluating result
+
 - (Named) results can be moved around
-- Languages must be enabled (e.g. in =.emacs=) before evaluation will complete: 
-  #+BEGIN_SRC lisp
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '((emacs-lisp . nil)
-     (sh . t)
-     (ditaa . t)))
-  #+END_SRC
+- Languages must be enabled (e.g. in =.emacs=) before evaluation will
+  complete:
+
+#+BEGIN_SRC lisp
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((emacs-lisp . nil)
+   (sh . t)
+   (ditaa . t)))
+#+END_SRC
 
 #+srcname: testbash
 #+BEGIN_SRC sh :exports both :results output
 # Try C-c C-c on me
 tail /var/log/system.log
 #+END_SRC
+
 ** AWK
+
 *** Basic syntax
+
 Awk programs are made up of pattern and operation pairs. Either the pattern or
 the operation may be empty. It is the pattern that decides whether a particular
 line is operated upon and precedes braces which define the logic that is to
 happen for that line. As an example, we can select all rows except the first
 (Numbered Record greater than 1) and print the final column with:
+
 #+BEGIN_SRC sh
 stevechallis:~$ echo -e "a A \n b B \n c C"| awk 'NR>1 { print $NF }'
 B
 C
 #+END_SRC
-A previous snippet to [[*Find%20all%20connections%20to%20a%20given%20port%20(e.g%20993)][find connections to a given port]] is a more complex example. 
+
+A previous snippet to [[*Find%20all%20connections%20to%20a%20given%20port%20(e.g%20993)][find connections to a given port]] is a more
+complex example.
+
 *** Use comma separated print without spaces between
+
 #+BEGIN_SRC sh
 awk -v OFS="" '{print $2,"=",$3}'
 #+END_SRC
+
 ** Tramp
+
 *** Open files from eterm terminal session on remote host
+
 Put the following in .bash_profile on the remote host:
+
 #+BEGIN_SRC sh
 # track directory, username, and cwd for remote logons
 if [ $TERM = eterm-color ]; then
@@ -422,51 +772,64 @@ if [ $TERM = eterm-color ]; then
         $@
         echo -e "\033AnSiTc" $(pwd)
     }
- 
+
     # set hostname, user, and cwd
     function eterm-reset {
         echo -e "\033AnSiTu" $(whoami)
         echo -e "\033AnSiTc" $(pwd)
         echo -e "\033AnSiTh" $(hostname -f)
     }
- 
+
     for temp in cd pushd popd; do
         alias $temp="eterm-set-cwd $temp"
     done
- 
+
     # set hostname, user, and cwd now
     eterm-reset
 fi
 #+END_SRC
+
 ** Unicode in Vim and Emacs
+
 | Emacs          | Vim         | Action                 |
 | M-h M-c        | <normal>ga  | Character under cursor |
 | M-x ucs-insert | <insert>C-v | Insert char by code    |
 |                | C-r C-r "   | Paste yanked text      |
 |                | :digraph    | Show list of codes     |
+
 * Design Patterns
+
 ** Abstract Factory
+
 Allows fundamental changes to large systems by modifying only the abstract
-  classes e.g. The Java Look'n'Feel for changing the widget set. This can be
-  done without conditionals, the polymorphism takes care of which concrete
-  classes get used for instantiations.
+classes e.g. The Java Look'n'Feel for changing the widget set. This can be
+done without conditionals, the polymorphism takes care of which concrete
+classes get used for instantiations.
 
-  (Generic example image)
+(Generic example image)
 
-  [[file:AbstractFactory.gif]]
+[[file:AbstractFactory.gif]]
+
 ** Monads
+
 A High level abstraction for threading the result of each given function into
 the next. Flattens out nested function calls.
+
 *** Details discussions
+
 - [[http://onclojure.com/2009/03/05/a-monad-tutorial-for-clojure-programmers-part-1/][onclojure.com]]
 - [[http://intensivesystems.net/tutorials/monads_101.html][intensivesystems.net]]
+
 * Bash
+
 ** Replace expression in all files in a directory
+
 #+BEGIN_SRC sh
 find . -type f | xargs perl -pe 's/mcr1_//g' -i
 #+END_SRC
+
 ** Verify/validate user entered data
-                                    
+
 #+BEGIN_SRC sh
  echo -n "Is this correct? (y/n): "
     read verify
@@ -495,16 +858,23 @@ function ask_for_data {
 
 ask_for_data "Please enter a username:" "^[a-z]+$" "USERNAME"
 #+END_SRC
+
 ** Find expiry dates of all pem certificates on a system
+
 #+BEGIN_SRC sh
 for f in `locate *.pem`; do if grep -q "Not After" $f ; then echo "| $f | $(grep 'Not After' $f) |"; fi ; done
 #+END_SRC
+
 ** History expansion
+
 *** Get last word of last command beginning with 'cp'
+
 #+BEGIN_SRC sh
 cd !cp:$
 #+END_SRC
+
 ** Change directory to path output by locate (Problems with unstringified output!)
+
 #+BEGIN_SRC sh
 cd "$(dirname "$(locate netbeans.clusters | tr -d '\n')")"
 #+END_SRC
